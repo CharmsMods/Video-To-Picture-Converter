@@ -1,4 +1,3 @@
-// Change these import statements to point to CDN URLs
 import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js';
 import { toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
 
@@ -46,8 +45,11 @@ const loadFFmpeg = async () => {
     });
 
     try {
-        // Using the same baseURL for core, wasm, and worker files from the CDN
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        // --- THIS IS THE CRITICAL CHANGE FOR @ffmpeg/core@0.12.x ---
+        // The core files are now directly under 'dist' for this version on unpkg.
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist'; // Corrected baseURL
+        // --- END CRITICAL CHANGE ---
+
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
