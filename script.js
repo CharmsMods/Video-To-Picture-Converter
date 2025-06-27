@@ -1,5 +1,6 @@
-import { FFmpeg } from 'https://unpkg.com/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js';
-import { toBlobURL } from 'https://unpkg.com/@ffmpeg/util@0.12.1/dist/esm/index.js';
+// *** CRITICAL CHANGE: Import FFmpeg and toBlobURL from jsDelivr as well ***
+import { FFmpeg } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/ffmpeg@0.12.6/dist/esm/index.js';
+import { toBlobURL } from 'https://cdn.jsdelivr.net/npm/@ffmpeg/util@0.12.1/dist/esm/index.js';
 
 const videoToFramesInput = document.getElementById('videoToFramesInput');
 const convertVideoToFramesBtn = document.getElementById('convertVideoToFramesBtn');
@@ -42,8 +43,7 @@ const loadFFmpeg = async () => {
     });
 
     try {
-        // *** CRITICAL CHANGE: Switched to jsDelivr CDN for core files ***
-        // This CDN often provides better reliability for WASM files and CORS.
+        // All core files are now fetched from jsDelivr, ensuring consistency
         const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
@@ -84,7 +84,7 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
         return;
     }
 
-    if (!ffmpeg || !ffmpeg.loaded) { // Check if ffmpeg is loaded
+    if (!ffmpeg || !ffmpeg.loaded) {
         messagesDiv.textContent = 'FFmpeg is still loading or failed to load. Please wait or refresh.';
         messagesDiv.style.display = 'block';
         return;
@@ -103,15 +103,12 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
         const videoData = await readFileAsUint8Array(videoFile);
         await ffmpeg.writeFile(inputFileName, videoData);
 
-        // Extract frames
-        const frameOutputPattern = 'frame_%04d.png'; // e.g., frame_0001.png
+        const frameOutputPattern = 'frame_%04d.png';
         await ffmpeg.exec(['-i', inputFileName, frameOutputPattern]);
 
-        // Extract audio
         const audioFileName = 'extracted_audio.mp3';
-        await ffmpeg.exec(['-i', inputFileName, '-vn', '-q:a', '0', audioFileName]); // -vn means no video
+        await ffmpeg.exec(['-i', inputFileName, '-vn', '-q:a', '0', audioFileName]);
 
-        // Read frames and display/download
         const files = await ffmpeg.listDir('.');
         const frameFiles = files.filter(file => file.name.startsWith('frame_') && file.name.endsWith('.png'));
 
@@ -143,7 +140,6 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
             }
         }
 
-        // Read audio and provide download
         const audioData = await ffmpeg.readFile(audioFileName);
         const audioBlob = new Blob([audioData.buffer], { type: 'audio/mpeg' });
         const audioUrl = URL.createObjectURL(audioBlob);
