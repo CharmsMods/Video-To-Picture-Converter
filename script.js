@@ -45,18 +45,17 @@ const loadFFmpeg = async () => {
     });
 
     try {
-        // --- THIS IS THE CRITICAL CHANGE FOR @ffmpeg/core@0.12.x ---
-        // The core files are now directly under 'dist' for this version on unpkg.
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist'; // Corrected baseURL
-        // --- END CRITICAL CHANGE ---
-
+        // *** This is the most common and robust baseURL for ffmpeg.wasm 0.12.x
+        //     when using unpkg directly for the core, worker, and wasm files.
+        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
             workerURL: await toBlobURL(`${baseURL}/ffmpeg-core.worker.js`, 'text/javascript'),
         });
+
         messagesDiv.textContent = 'FFmpeg loaded successfully!';
-        setTimeout(() => messagesDiv.style.display = 'none', 3000); // Hide after a few seconds
+        setTimeout(() => messagesDiv.style.display = 'none', 3000);
     } catch (error) {
         messagesDiv.textContent = `Error loading FFmpeg: ${error.message}. Check console for details.`;
         console.error('Error loading FFmpeg:', error);
@@ -108,13 +107,11 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
         await ffmpeg.writeFile(inputFileName, videoData);
 
         // Extract frames
-        // Use a common image format like png or jpg. WebM/WebP might not be universally supported for viewing frames directly.
         const frameOutputPattern = 'frame_%04d.png'; // e.g., frame_0001.png
         await ffmpeg.exec(['-i', inputFileName, frameOutputPattern]);
 
         // Extract audio
         const audioFileName = 'extracted_audio.mp3';
-        // Using -q:a 0 for highest quality MP3. Adjust if needed.
         await ffmpeg.exec(['-i', inputFileName, '-vn', '-q:a', '0', audioFileName]); // -vn means no video
 
         // Read frames and display/download
@@ -149,10 +146,9 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
             }
         }
 
-
         // Read audio and provide download
         const audioData = await ffmpeg.readFile(audioFileName);
-        const audioBlob = new Blob([audioData.buffer], { type: 'audio/mpeg' }); // Use audio/mpeg for mp3
+        const audioBlob = new Blob([audioData.buffer], { type: 'audio/mpeg' });
         const audioUrl = URL.createObjectURL(audioBlob);
 
         const audioEl = document.createElement('audio');
@@ -174,7 +170,6 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
         progressBarContainer.style.display = 'none';
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
-        // It's good practice to clean up files in FFmpeg's virtual file system if they are large
         try {
             await ffmpeg.rm(inputFileName);
             const filesToRemove = (await ffmpeg.listDir('.')).filter(file => file.name.startsWith('frame_') || file.name === 'extracted_audio.mp3');
@@ -217,8 +212,6 @@ convertFramesToVideoBtn.addEventListener('click', async () => {
     videoOutput.innerHTML = '';
 
     try {
-        // Sort frames by name to ensure correct order (e.g., frame_0001.png, frame_0002.png)
-        // This is crucial for FFmpeg to stitch them correctly.
         const sortedFrameFiles = Array.from(frameFiles).sort((a, b) => {
             return a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' });
         });
@@ -228,24 +221,19 @@ convertFramesToVideoBtn.addEventListener('click', async () => {
             throw new Error('Could not determine file extension for frames.');
         }
 
-        // Write frames to FFmpeg's file system
-        // Use a consistent naming pattern for FFmpeg's image sequence input
         for (let i = 0; i < sortedFrameFiles.length; i++) {
             const file = sortedFrameFiles[i];
             const data = await readFileAsUint8Array(file);
-            const paddedIndex = String(i).padStart(4, '0'); // e.g., 0000, 0001
+            const paddedIndex = String(i).padStart(4, '0');
             await ffmpeg.writeFile(`input_frame_${paddedIndex}.${firstFrameExtension}`, data);
         }
 
         const outputVideoName = 'output.mp4';
         let ffmpegVideoCommand = [
             '-framerate', framerate.toString(),
-            // Input pattern for image sequence. %04d means 4 digits padded with zeros.
             '-i', `input_frame_%04d.${firstFrameExtension}`,
             '-c:v', 'libx264',
-            '-pix_fmt', 'yuv420p', // Important for broad browser compatibility
-            // '-preset', 'fast', // Optional: for faster encoding, slightly larger file size
-            // '-crf', '23',       // Optional: Constant Rate Factor (quality). Lower is better quality, larger file.
+            '-pix_fmt', 'yuv420p',
             outputVideoName
         ];
 
@@ -258,27 +246,24 @@ convertFramesToVideoBtn.addEventListener('click', async () => {
             await ffmpeg.writeFile(audioInputFileName, audioData);
 
             const tempVideoName = 'temp_video.mp4';
-            // Create video without audio first
             await ffmpeg.exec(ffmpegVideoCommand.slice(0, ffmpegVideoCommand.length - 1).concat([tempVideoName]));
 
             finalOutputFileName = 'final_video_with_audio.mp4';
             await ffmpeg.exec([
                 '-i', tempVideoName,
                 '-i', audioInputFileName,
-                '-c:v', 'copy', // Copy video stream without re-encoding
-                '-c:a', 'aac', // Encode audio to AAC for broad compatibility
-                '-map', '0:v:0', // Map video stream from the first input (temp_video.mp4)
-                '-map', '1:a:0', // Map audio stream from the second input (audioInputFileName)
-                '-shortest', // Finish encoding when the shortest input stream ends
+                '-c:v', 'copy',
+                '-c:a', 'aac',
+                '-map', '0:v:0',
+                '-map', '1:a:0',
+                '-shortest',
                 finalOutputFileName
             ]);
-            await ffmpeg.rm(tempVideoName); // Clean up temporary video
+            await ffmpeg.rm(tempVideoName);
         } else {
-            // No audio file, just create the video from frames
             await ffmpeg.exec(ffmpegVideoCommand);
         }
 
-        // Read output video and provide download
         const outputVideoData = await ffmpeg.readFile(finalOutputFileName);
         const videoBlob = new Blob([outputVideoData.buffer], { type: 'video/mp4' });
         const videoUrl = URL.createObjectURL(videoBlob);
@@ -303,7 +288,6 @@ convertFramesToVideoBtn.addEventListener('click', async () => {
         progressBarContainer.style.display = 'none';
         progressBar.style.width = '0%';
         progressBar.textContent = '0%';
-        // Clean up FFmpeg's virtual file system for input frames and audio
         try {
             const filesToRemove = (await ffmpeg.listDir('.')).filter(file => file.name.startsWith('input_frame_') || file.name === audioFile?.name);
             for (const fileInfo of filesToRemove) {
