@@ -28,13 +28,10 @@ const loadFFmpeg = async () => {
     }
     ffmpeg = new FFmpeg();
     ffmpeg.on('log', ({ message }) => {
-        // Only show relevant log messages to the user,
-        // or just update a more specific progress message.
-        // For actual progress, use the 'progress' event.
         if (message.includes('loading') || message.includes('complete')) {
             messagesDiv.textContent = message;
         }
-        console.log(message); // Keep full logs in console for debugging
+        console.log(message);
     });
     ffmpeg.on('progress', ({ progress, time }) => {
         progressBar.style.width = `${progress * 100}%`;
@@ -45,9 +42,9 @@ const loadFFmpeg = async () => {
     });
 
     try {
-        // *** This is the most common and robust baseURL for ffmpeg.wasm 0.12.x
-        //     when using unpkg directly for the core, worker, and wasm files.
-        const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
+        // *** CRITICAL CHANGE: Switched to jsDelivr CDN for core files ***
+        // This CDN often provides better reliability for WASM files and CORS.
+        const baseURL = 'https://cdn.jsdelivr.net/npm/@ffmpeg/core@0.12.6/dist/esm';
         await ffmpeg.load({
             coreURL: await toBlobURL(`${baseURL}/ffmpeg-core.js`, 'text/javascript'),
             wasmURL: await toBlobURL(`${baseURL}/ffmpeg-core.wasm`, 'application/wasm'),
@@ -159,7 +156,6 @@ convertVideoToFramesBtn.addEventListener('click', async () => {
         const audioDownloadLink = document.createElement('a');
         audioDownloadLink.href = audioUrl;
         audioDownloadLink.download = audioFileName;
-        audioDownloadLink.textContent = `Download ${audioFileName}`;
         audioOutput.appendChild(audioDownloadLink);
 
         messagesDiv.textContent = 'Video converted to frames and audio extracted!';
